@@ -2,11 +2,12 @@ package com.seuprojeto.tickets.service;
 
 import com.seuprojeto.tickets.dto.CreateTicketDTO;
 import com.seuprojeto.tickets.dto.TicketResponseDTO;
+import com.seuprojeto.tickets.enums.TicketStatus;
 import com.seuprojeto.tickets.entity.Ticket;
 import com.seuprojeto.tickets.entity.User;
-import com.seuprojeto.tickets.enums.TicketStatus;
 import com.seuprojeto.tickets.repository.TicketRepository;
 import com.seuprojeto.tickets.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +24,7 @@ public class TicketService {
     public TicketResponseDTO createTicket(CreateTicketDTO dto, Long userId) {
 
         User creator = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
         Ticket ticket = Ticket.builder()
                 .title(dto.title())
@@ -52,5 +53,32 @@ public class TicketService {
 
     public List<Ticket> listAll() {
         return ticketRepository.findAll();
+    }
+
+    public List<Ticket> listByUser(Long userId) {
+        return ticketRepository.findByCreatedById(userId);
+    }
+
+    public TicketResponseDTO updateStatus(Long ticketId, TicketStatus newStatus, Long userId) {
+
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new RuntimeException("Ticket não encontrado"));
+
+        ticket.setStatus(newStatus);
+        ticket.setUpdatedAt(LocalDateTime.now());
+
+        Ticket saved = ticketRepository.save(ticket);
+
+        return new TicketResponseDTO(
+                saved.getId(),
+                saved.getTitle(),
+                saved.getDescription(),
+                saved.getPriority(),
+                saved.getStatus(),
+                saved.getCreatedBy().getId(),
+                saved.getAssignedTo() != null ? saved.getAssignedTo().getId() : null,
+                saved.getCreatedAt(),
+                saved.getUpdatedAt()
+        );
     }
 }
