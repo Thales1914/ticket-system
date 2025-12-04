@@ -8,15 +8,21 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class UserService {
+
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public UserResponseDTO createUser(CreateUserDTO dto){
+    // ----------------------------------------------------
+    // 🔹 CRIAR USUÁRIO
+    // ----------------------------------------------------
+    public UserResponseDTO createUser(CreateUserDTO dto) {
 
-        if (userRepository.findByEmail(dto.email()).isPresent()){
+        if (userRepository.findByEmail(dto.email()).isPresent()) {
             throw new RuntimeException("Email já está em uso.");
         }
 
@@ -35,5 +41,14 @@ public class UserService {
                 saved.getEmail(),
                 saved.getRole()
         );
+    }
+
+    public User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+    }
+
+    public List<User> listAllUsers() {
+        return userRepository.findAll();
     }
 }
