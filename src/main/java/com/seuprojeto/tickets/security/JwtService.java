@@ -20,54 +20,40 @@ public class JwtService {
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
 
-    // -----------------------------------------------------------
-    // 🔹 GERAR TOKEN COM ID E ROLE
-    // -----------------------------------------------------------
-    public String generateToken(Long userId, String role) {
+    public String generateToken(Long userId, String email, String role) {
 
         return Jwts.builder()
-                .setSubject(String.valueOf(userId))  // ID do usuário
-                .claim("role", role)                 // ROLE do usuário
+                .setSubject(String.valueOf(userId))
+                .claim("email", email)
+                .claim("role", role)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + 86400000)) // 24h
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    // -----------------------------------------------------------
-    // 🔹 VALIDAR TOKEN
-    // -----------------------------------------------------------
     public boolean isTokenValid(String token) {
         try {
-            Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
-                    .build()
-                    .parseClaimsJws(token);
-
+            parse(token);
             return true;
         } catch (Exception e) {
             return false;
         }
     }
 
-    // -----------------------------------------------------------
-    // 🔹 PEGAR USER ID DO TOKEN
-    // -----------------------------------------------------------
+    public String getEmailFromToken(String token) {
+        return parse(token).get("email", String.class);
+    }
+
     public Long getUserIdFromToken(String token) {
-        return Long.parseLong(getAllClaims(token).getSubject());
+        return Long.parseLong(parse(token).getSubject());
     }
 
-    // -----------------------------------------------------------
-    // 🔹 PEGAR ROLE DO TOKEN
-    // -----------------------------------------------------------
     public String getRoleFromToken(String token) {
-        return getAllClaims(token).get("role", String.class);
+        return parse(token).get("role", String.class);
     }
 
-    // -----------------------------------------------------------
-    // 🔹 PEGAR TODAS AS CLAIMS
-    // -----------------------------------------------------------
-    private Claims getAllClaims(String token) {
+    private Claims parse(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
                 .build()

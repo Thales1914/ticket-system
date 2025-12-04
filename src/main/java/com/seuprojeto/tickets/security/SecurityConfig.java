@@ -12,7 +12,6 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -35,9 +34,7 @@ public class SecurityConfig {
 
         http
                 .csrf(csrf -> csrf.disable())
-                // ATIVA CORS usando o bean corsConfigurationSource()
                 .cors(Customizer.withDefaults())
-                // JWT -> sessão stateless
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
@@ -45,20 +42,22 @@ public class SecurityConfig {
 
                         .requestMatchers("/auth/**", "/error").permitAll()
 
+                        .requestMatchers(HttpMethod.GET, "/user/all").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/user/agents").hasAnyRole("ADMIN", "AGENT")
+                        .requestMatchers(HttpMethod.POST, "/user").hasRole("ADMIN")
+
                         .requestMatchers(HttpMethod.POST, "/tickets")
-                        .hasAnyRole("CLIENT", "ADMIN")
+                        .hasAnyRole("CLIENT", "AGENT", "ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/tickets")
                         .hasAnyRole("ADMIN", "AGENT")
 
-                        .requestMatchers(HttpMethod.GET, "/tickets/me")
-                        .authenticated()
+                        .requestMatchers(HttpMethod.GET, "/tickets/me").authenticated()
 
                         .requestMatchers(HttpMethod.PATCH, "/tickets/**")
                         .hasAnyRole("ADMIN", "AGENT")
 
-                        .requestMatchers(HttpMethod.GET, "/user")
-                        .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/tickets/search").authenticated()
 
                         .anyRequest().authenticated()
                 );
@@ -87,11 +86,10 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
-    // ===== CORS CONFIGURATION =====
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // frontend do Vite
+
         config.setAllowedOrigins(List.of("http://localhost:5173"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));

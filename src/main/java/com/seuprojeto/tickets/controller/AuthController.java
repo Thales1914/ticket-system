@@ -7,6 +7,7 @@ import com.seuprojeto.tickets.dto.UserResponseDTO;
 import com.seuprojeto.tickets.entity.User;
 import com.seuprojeto.tickets.security.JwtService;
 import com.seuprojeto.tickets.service.UserService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -40,6 +41,7 @@ public class AuthController {
 
         String token = jwtService.generateToken(
                 user.getId(),
+                user.getEmail(),
                 user.getRole().name()
         );
 
