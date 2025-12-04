@@ -7,12 +7,15 @@ import com.seuprojeto.tickets.entity.Ticket;
 import com.seuprojeto.tickets.enums.TicketPriority;
 import com.seuprojeto.tickets.enums.TicketStatus;
 import com.seuprojeto.tickets.service.TicketService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -30,9 +33,7 @@ public class TicketController {
     }
 
     @PostMapping
-    public ResponseEntity<TicketResponseDTO> createTicket(
-            @Valid @RequestBody CreateTicketDTO dto
-    ) {
+    public ResponseEntity<TicketResponseDTO> createTicket(@Valid @RequestBody CreateTicketDTO dto) {
         Long userId = getAuthenticatedUserId();
         return ResponseEntity.ok(ticketService.createTicket(dto, userId));
     }
@@ -70,11 +71,13 @@ public class TicketController {
     public ResponseEntity<List<Ticket>> searchTickets(
             @RequestParam(required = false) TicketStatus status,
             @RequestParam(required = false) TicketPriority priority,
+            @RequestParam(required = false) Long createdBy,
             @RequestParam(required = false) Long assignedTo,
-            @RequestParam(required = false) Long createdBy
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        return ResponseEntity.ok(
-                ticketService.searchTickets(status, priority, assignedTo, createdBy)
-        );
+
+        List<Ticket> result = ticketService.searchTickets(status, priority, createdBy, assignedTo, from, to);
+        return ResponseEntity.ok(result);
     }
 }
