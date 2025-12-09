@@ -10,10 +10,11 @@ import com.seuprojeto.tickets.enums.UserRole;
 import com.seuprojeto.tickets.repository.TicketRepository;
 import com.seuprojeto.tickets.repository.UserRepository;
 import com.seuprojeto.tickets.specs.TicketSpecifications;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -27,11 +28,29 @@ public class TicketService {
     private final UserRepository userRepository;
     private final TicketHistoryService ticketHistoryService;
 
+    private User findUserOrFail(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario nao encontrado"));
+    }
+
+    private Ticket findTicketOrFail(Long ticketId) {
+        return ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket nao encontrado"));
+    }
+
+    private void ensureCanView(Ticket ticket, User requester) {
+        if (requester.getRole() == UserRole.CLIENT) {
+            Long creatorId = ticket.getCreatedBy() != null ? ticket.getCreatedBy().getId() : null;
+            if (!requester.getId().equals(creatorId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Voce nao tem permissao para acessar este ticket.");
+            }
+        }
+    }
+
     // ---------------------- CREATE ----------------------
 
     public TicketResponseDTO createTicket(CreateTicketDTO dto, Long userId) {
-        User creator = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        User creator = findUserOrFail(userId);
 
         Ticket ticket = Ticket.builder()
                 .title(dto.title())
@@ -45,7 +64,6 @@ public class TicketService {
 
         Ticket saved = ticketRepository.save(ticket);
 
-        // histórico: CREATED
         ticketHistoryService.log(
                 saved,
                 "CREATED",
@@ -59,9 +77,10 @@ public class TicketService {
 
     // ---------------------- GET BY ID ----------------------
 
-    public TicketResponseDTO getById(Long ticketId) {
-        Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new RuntimeException("Ticket não encontrado"));
+    public TicketResponseDTO getById(Long ticketId, Long requesterId) {
+        Ticket ticket = findTicketOrFail(ticketId);
+        User requester = findUserOrFail(requesterId);
+        ensureCanView(ticket, requester);
         return toDTO(ticket);
     }
 
@@ -80,43 +99,43 @@ public class TicketService {
     // ---------------------- STATUS UPDATE ----------------------
 
     public TicketResponseDTO updateStatus(Long ticketId, TicketStatus newStatus, Long userId) {
-        Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new RuntimeException("Ticket não encontrado"));
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        Ticket ticket = findTicketOrFail(ticketId);
+        User user = findUserOrFail(userId);
 
         TicketStatus current = ticket.getStatus();
 
-        if (current == newStatus)
-            throw new RuntimeException("O ticket já está com o status " + newStatus);
+        if (current == newStatus) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O ticket ja esta com o status " + newStatus);
+        }
 
-        // regras de fluxo
+        // fluxo permitido
         switch (current) {
             case ABERTO -> {
                 if (newStatus != TicketStatus.EM_ATENDIMENTO &&
-                        newStatus != TicketStatus.CANCELADO)
-                    throw new RuntimeException("ABERTO só pode ir para EM_ATENDIMENTO ou CANCELADO.");
+                        newStatus != TicketStatus.CANCELADO) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ABERTO so pode ir para EM_ATENDIMENTO ou CANCELADO.");
+                }
             }
             case EM_ATENDIMENTO -> {
                 if (newStatus != TicketStatus.RESOLVIDO &&
-                        newStatus != TicketStatus.CANCELADO)
-                    throw new RuntimeException("EM_ATENDIMENTO só pode ir para RESOLVIDO ou CANCELADO.");
+                        newStatus != TicketStatus.CANCELADO) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "EM_ATENDIMENTO so pode ir para RESOLVIDO ou CANCELADO.");
+                }
             }
-            case RESOLVIDO, CANCELADO -> {
-                throw new RuntimeException("Não é possível alterar um ticket que está RESOLVIDO ou CANCELADO.");
-            }
+            case RESOLVIDO, CANCELADO -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nao e possivel alterar um ticket RESOLVIDO ou CANCELADO.");
         }
 
         // regras por role
         switch (newStatus) {
             case EM_ATENDIMENTO, RESOLVIDO -> {
-                if (user.getRole() == UserRole.CLIENT)
-                    throw new RuntimeException("Somente AGENT ou ADMIN podem fazer essa ação.");
+                if (user.getRole() == UserRole.CLIENT) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Somente AGENT ou ADMIN podem fazer essa acao.");
+                }
             }
             case CANCELADO -> {
-                if (user.getRole() != UserRole.ADMIN)
-                    throw new RuntimeException("Somente ADMIN pode cancelar tickets.");
+                if (user.getRole() != UserRole.ADMIN) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Somente ADMIN pode cancelar tickets.");
+                }
             }
         }
 
@@ -126,7 +145,6 @@ public class TicketService {
 
         Ticket saved = ticketRepository.save(ticket);
 
-        // histórico: STATUS_CHANGED
         ticketHistoryService.log(
                 saved,
                 "STATUS_CHANGED",
@@ -141,23 +159,25 @@ public class TicketService {
     // ---------------------- ASSIGN ----------------------
 
     public TicketResponseDTO assignTicket(Long ticketId, Long agentId, Long requesterId) {
-        Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new RuntimeException("Ticket não encontrado."));
+        Ticket ticket = findTicketOrFail(ticketId);
+        User requester = findUserOrFail(requesterId);
+        User agent = findUserOrFail(agentId);
 
-        User requester = userRepository.findById(requesterId)
-                .orElseThrow(() -> new RuntimeException("Usuário solicitante não encontrado."));
+        if (agent.getRole() == UserRole.CLIENT) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Somente AGENT ou ADMIN podem ser atribuidos como responsaveis.");
+        }
 
-        User agent = userRepository.findById(agentId)
-                .orElseThrow(() -> new RuntimeException("Agente não encontrado."));
+        if (requester.getRole() == UserRole.CLIENT) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Clientes nao podem atribuir tickets.");
+        }
 
-        if (requester.getRole() == UserRole.CLIENT)
-            throw new RuntimeException("Clientes não podem atribuir tickets.");
+        if (requester.getRole() == UserRole.AGENT && !requesterId.equals(agentId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Agentes so podem atribuir tickets para si mesmos.");
+        }
 
-        if (requester.getRole() == UserRole.AGENT && !requesterId.equals(agentId))
-            throw new RuntimeException("Agentes só podem atribuir tickets para si mesmos.");
-
-        if (ticket.getAssignedTo() != null)
-            throw new RuntimeException("Este ticket já foi atribuído.");
+        if (ticket.getAssignedTo() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Este ticket ja foi atribuido.");
+        }
 
         User oldAssignee = ticket.getAssignedTo();
 
@@ -167,7 +187,6 @@ public class TicketService {
 
         Ticket saved = ticketRepository.save(ticket);
 
-        // histórico: ASSIGNED
         ticketHistoryService.log(
                 saved,
                 "ASSIGNED",
@@ -187,12 +206,19 @@ public class TicketService {
             Long createdBy,
             Long assignedTo,
             LocalDate from,
-            LocalDate to
+            LocalDate to,
+            Long requesterId
     ) {
+        User requester = findUserOrFail(requesterId);
+
+        Long createdFilter = createdBy;
+        if (requester.getRole() == UserRole.CLIENT) {
+            createdFilter = requesterId;
+        }
 
         Specification<Ticket> spec = Specification.where(TicketSpecifications.hasStatus(status))
                 .and(TicketSpecifications.hasPriority(priority))
-                .and(TicketSpecifications.createdBy(createdBy))
+                .and(TicketSpecifications.createdBy(createdFilter))
                 .and(TicketSpecifications.assignedTo(assignedTo))
                 .and(TicketSpecifications.createdAfter(from != null ? from.atStartOfDay() : null))
                 .and(TicketSpecifications.createdBefore(to != null ? to.atTime(23, 59, 59) : null));
@@ -212,8 +238,10 @@ public class TicketService {
                 saved.getStatus(),
                 saved.getCreatedBy() != null ? saved.getCreatedBy().getId() : null,
                 saved.getCreatedBy() != null ? saved.getCreatedBy().getName() : null,
+                saved.getCreatedBy() != null ? saved.getCreatedBy().getEmail() : null,
                 saved.getAssignedTo() != null ? saved.getAssignedTo().getId() : null,
                 saved.getAssignedTo() != null ? saved.getAssignedTo().getName() : null,
+                saved.getAssignedTo() != null ? saved.getAssignedTo().getEmail() : null,
                 saved.getCreatedAt(),
                 saved.getUpdatedAt()
         );

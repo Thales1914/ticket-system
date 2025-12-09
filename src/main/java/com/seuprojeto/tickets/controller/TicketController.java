@@ -56,7 +56,8 @@ public class TicketController {
 
     @GetMapping("/{ticketId}")
     public ResponseEntity<TicketResponseDTO> getTicketById(@PathVariable Long ticketId) {
-        TicketResponseDTO dto = ticketService.getById(ticketId);
+        Long userId = getAuthenticatedUserId();
+        TicketResponseDTO dto = ticketService.getById(ticketId, userId);
         return ResponseEntity.ok(dto);
     }
 
@@ -103,8 +104,10 @@ public class TicketController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
 
+        Long userId = getAuthenticatedUserId();
+
         List<TicketResponseDTO> result = ticketService.searchTickets(
-                status, priority, createdBy, assignedTo, from, to
+                status, priority, createdBy, assignedTo, from, to, userId
         );
         return ResponseEntity.ok(result);
     }

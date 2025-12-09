@@ -13,8 +13,10 @@ public record TicketResponseDTO(
         TicketStatus status,
         Long createdById,
         String createdByName,
+        String createdByEmail,
         Long assignedToId,
         String assignedToName,
+        String assignedToEmail,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {}

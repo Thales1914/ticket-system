@@ -9,6 +9,7 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -23,6 +24,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -42,22 +44,20 @@ public class SecurityConfig {
 
                         .requestMatchers("/auth/**", "/error").permitAll()
 
-                        .requestMatchers(HttpMethod.GET, "/user/all").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/user/agents").hasAnyRole("ADMIN", "AGENT")
-                        .requestMatchers(HttpMethod.POST, "/user").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/users").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/users/agents").hasAnyRole("ADMIN", "AGENT")
+                        .requestMatchers(HttpMethod.POST, "/users").hasRole("ADMIN")
 
                         .requestMatchers(HttpMethod.POST, "/tickets")
                         .hasAnyRole("CLIENT", "AGENT", "ADMIN")
 
-                        .requestMatchers(HttpMethod.GET, "/tickets")
-                        .hasAnyRole("ADMIN", "AGENT")
-
+                        .requestMatchers(HttpMethod.GET, "/tickets").hasAnyRole("ADMIN", "AGENT")
+                        .requestMatchers(HttpMethod.GET, "/tickets/search").hasAnyRole("ADMIN", "AGENT")
                         .requestMatchers(HttpMethod.GET, "/tickets/me").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/tickets/**").authenticated()
 
                         .requestMatchers(HttpMethod.PATCH, "/tickets/**")
                         .hasAnyRole("ADMIN", "AGENT")
-
-                        .requestMatchers(HttpMethod.GET, "/tickets/search").authenticated()
 
                         .anyRequest().authenticated()
                 );

@@ -5,6 +5,7 @@ import com.seuprojeto.tickets.dto.LoginDTO;
 import com.seuprojeto.tickets.dto.LoginResponseDTO;
 import com.seuprojeto.tickets.dto.UserResponseDTO;
 import com.seuprojeto.tickets.entity.User;
+import com.seuprojeto.tickets.enums.UserRole;
 import com.seuprojeto.tickets.security.JwtService;
 import com.seuprojeto.tickets.service.UserService;
 
@@ -24,7 +25,15 @@ public class AuthController {
 
     @PostMapping("/register")
     public UserResponseDTO register(@RequestBody CreateUserDTO dto) {
-        return userService.createUser(dto);
+        // RegistraÇõÇœo pÇ§blica sempre cria CLIENT independente do payload recebido
+        CreateUserDTO safeDto = new CreateUserDTO(
+                dto.name(),
+                dto.email(),
+                dto.password(),
+                UserRole.CLIENT
+        );
+
+        return userService.createUser(safeDto);
     }
 
     @PostMapping("/login")

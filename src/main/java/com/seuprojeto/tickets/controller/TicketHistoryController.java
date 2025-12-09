@@ -4,8 +4,10 @@ import com.seuprojeto.tickets.dto.TicketHistoryDTO;
 import com.seuprojeto.tickets.entity.TicketHistory;
 import com.seuprojeto.tickets.repository.UserRepository;
 import com.seuprojeto.tickets.service.TicketHistoryService;
+import com.seuprojeto.tickets.service.TicketService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,9 +19,22 @@ public class TicketHistoryController {
 
     private final TicketHistoryService ticketHistoryService;
     private final UserRepository userRepository;
+    private final TicketService ticketService;
+
+    private Long getAuthenticatedUserId() {
+        String userIdString = SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getName();
+        return Long.parseLong(userIdString);
+    }
 
     @GetMapping("/{ticketId}/history")
     public ResponseEntity<List<TicketHistoryDTO>> getHistory(@PathVariable Long ticketId) {
+        Long userId = getAuthenticatedUserId();
+
+        // Garantia de autorizacao: valida se o usuario pode ver o ticket
+        ticketService.getById(ticketId, userId);
+
         List<TicketHistory> history = ticketHistoryService.getHistoryForTicket(ticketId);
 
         List<TicketHistoryDTO> dtoList = history.stream()
