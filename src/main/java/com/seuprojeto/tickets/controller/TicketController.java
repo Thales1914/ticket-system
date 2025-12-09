@@ -3,7 +3,6 @@ package com.seuprojeto.tickets.controller;
 import com.seuprojeto.tickets.dto.CreateTicketDTO;
 import com.seuprojeto.tickets.dto.TicketResponseDTO;
 import com.seuprojeto.tickets.dto.UpdateStatusDTO;
-import com.seuprojeto.tickets.entity.Ticket;
 import com.seuprojeto.tickets.enums.TicketPriority;
 import com.seuprojeto.tickets.enums.TicketStatus;
 import com.seuprojeto.tickets.service.TicketService;
@@ -32,22 +31,36 @@ public class TicketController {
         return Long.parseLong(userIdString);
     }
 
+    // ---------------------- CREATE ----------------------
+
     @PostMapping
     public ResponseEntity<TicketResponseDTO> createTicket(@Valid @RequestBody CreateTicketDTO dto) {
         Long userId = getAuthenticatedUserId();
         return ResponseEntity.ok(ticketService.createTicket(dto, userId));
     }
 
+    // ---------------------- LIST ----------------------
+
     @GetMapping
-    public ResponseEntity<List<Ticket>> listTickets() {
+    public ResponseEntity<List<TicketResponseDTO>> listTickets() {
         return ResponseEntity.ok(ticketService.listAll());
     }
 
     @GetMapping("/me")
-    public ResponseEntity<List<Ticket>> listMyTickets() {
+    public ResponseEntity<List<TicketResponseDTO>> listMyTickets() {
         Long userId = getAuthenticatedUserId();
         return ResponseEntity.ok(ticketService.listByUser(userId));
     }
+
+    // ---------------------- GET BY ID (DETALHES) ----------------------
+
+    @GetMapping("/{ticketId}")
+    public ResponseEntity<TicketResponseDTO> getTicketById(@PathVariable Long ticketId) {
+        TicketResponseDTO dto = ticketService.getById(ticketId);
+        return ResponseEntity.ok(dto);
+    }
+
+    // ---------------------- STATUS UPDATE ----------------------
 
     @PatchMapping("/{ticketId}/status")
     public ResponseEntity<TicketResponseDTO> updateStatus(
@@ -58,6 +71,8 @@ public class TicketController {
         return ResponseEntity.ok(ticketService.updateStatus(ticketId, dto.status(), userId));
     }
 
+    // ---------------------- ASSIGN ----------------------
+
     @PatchMapping("/{ticketId}/assign/{agentId}")
     public ResponseEntity<TicketResponseDTO> assignTicket(
             @PathVariable Long ticketId,
@@ -67,8 +82,19 @@ public class TicketController {
         return ResponseEntity.ok(ticketService.assignTicket(ticketId, agentId, requesterId));
     }
 
+    // "Assumir pra mim" (AGENT/ADMIN)
+    @PatchMapping("/{ticketId}/assign/me")
+    public ResponseEntity<TicketResponseDTO> assignToCurrentUser(
+            @PathVariable Long ticketId
+    ) {
+        Long currentUserId = getAuthenticatedUserId();
+        return ResponseEntity.ok(ticketService.assignTicket(ticketId, currentUserId, currentUserId));
+    }
+
+    // ---------------------- SEARCH ----------------------
+
     @GetMapping("/search")
-    public ResponseEntity<List<Ticket>> searchTickets(
+    public ResponseEntity<List<TicketResponseDTO>> searchTickets(
             @RequestParam(required = false) TicketStatus status,
             @RequestParam(required = false) TicketPriority priority,
             @RequestParam(required = false) Long createdBy,
@@ -77,7 +103,9 @@ public class TicketController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
 
-        List<Ticket> result = ticketService.searchTickets(status, priority, createdBy, assignedTo, from, to);
+        List<TicketResponseDTO> result = ticketService.searchTickets(
+                status, priority, createdBy, assignedTo, from, to
+        );
         return ResponseEntity.ok(result);
     }
 }

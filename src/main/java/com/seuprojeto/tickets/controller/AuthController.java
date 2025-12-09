@@ -30,12 +30,14 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResponseDTO login(@RequestBody LoginDTO dto) {
 
+        // Cria o token de autenticação (e-mail + senha)
         var authToken = new UsernamePasswordAuthenticationToken(
                 dto.email(),
                 dto.password()
         );
 
         authenticationManager.authenticate(authToken);
+
 
         User user = userService.getUserByEmail(dto.email());
 
@@ -45,6 +47,13 @@ public class AuthController {
                 user.getRole().name()
         );
 
-        return new LoginResponseDTO(token);
+        UserResponseDTO userDto = new UserResponseDTO(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getRole()
+        );
+
+        return new LoginResponseDTO(token, userDto);
     }
 }

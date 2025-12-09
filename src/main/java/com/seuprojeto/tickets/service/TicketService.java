@@ -2,7 +2,6 @@ package com.seuprojeto.tickets.service;
 
 import com.seuprojeto.tickets.dto.CreateTicketDTO;
 import com.seuprojeto.tickets.dto.TicketResponseDTO;
-import com.seuprojeto.tickets.dto.UpdateStatusDTO;
 import com.seuprojeto.tickets.entity.Ticket;
 import com.seuprojeto.tickets.entity.User;
 import com.seuprojeto.tickets.enums.TicketPriority;
@@ -26,6 +25,7 @@ public class TicketService {
 
     private final TicketRepository ticketRepository;
     private final UserRepository userRepository;
+    private final TicketHistoryService ticketHistoryService;
 
     // ---------------------- CREATE ----------------------
 
@@ -44,17 +44,37 @@ public class TicketService {
                 .build();
 
         Ticket saved = ticketRepository.save(ticket);
+
+        // histórico: CREATED
+        ticketHistoryService.log(
+                saved,
+                "CREATED",
+                null,
+                null,
+                creator.getId()
+        );
+
         return toDTO(saved);
+    }
+
+    // ---------------------- GET BY ID ----------------------
+
+    public TicketResponseDTO getById(Long ticketId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new RuntimeException("Ticket não encontrado"));
+        return toDTO(ticket);
     }
 
     // ---------------------- LIST ----------------------
 
-    public List<Ticket> listAll() {
-        return ticketRepository.findAll();
+    public List<TicketResponseDTO> listAll() {
+        List<Ticket> tickets = ticketRepository.findAll();
+        return toDTOList(tickets);
     }
 
-    public List<Ticket> listByUser(Long userId) {
-        return ticketRepository.findByCreatedById(userId);
+    public List<TicketResponseDTO> listByUser(Long userId) {
+        List<Ticket> tickets = ticketRepository.findByCreatedById(userId);
+        return toDTOList(tickets);
     }
 
     // ---------------------- STATUS UPDATE ----------------------
@@ -71,6 +91,7 @@ public class TicketService {
         if (current == newStatus)
             throw new RuntimeException("O ticket já está com o status " + newStatus);
 
+        // regras de fluxo
         switch (current) {
             case ABERTO -> {
                 if (newStatus != TicketStatus.EM_ATENDIMENTO &&
@@ -87,6 +108,7 @@ public class TicketService {
             }
         }
 
+        // regras por role
         switch (newStatus) {
             case EM_ATENDIMENTO, RESOLVIDO -> {
                 if (user.getRole() == UserRole.CLIENT)
@@ -98,10 +120,21 @@ public class TicketService {
             }
         }
 
+        TicketStatus oldStatus = current;
         ticket.setStatus(newStatus);
         ticket.setUpdatedAt(LocalDateTime.now());
 
         Ticket saved = ticketRepository.save(ticket);
+
+        // histórico: STATUS_CHANGED
+        ticketHistoryService.log(
+                saved,
+                "STATUS_CHANGED",
+                oldStatus.name(),
+                newStatus.name(),
+                user.getId()
+        );
+
         return toDTO(saved);
     }
 
@@ -126,17 +159,29 @@ public class TicketService {
         if (ticket.getAssignedTo() != null)
             throw new RuntimeException("Este ticket já foi atribuído.");
 
+        User oldAssignee = ticket.getAssignedTo();
+
         ticket.setAssignedTo(agent);
         ticket.setStatus(TicketStatus.EM_ATENDIMENTO);
         ticket.setUpdatedAt(LocalDateTime.now());
 
         Ticket saved = ticketRepository.save(ticket);
+
+        // histórico: ASSIGNED
+        ticketHistoryService.log(
+                saved,
+                "ASSIGNED",
+                oldAssignee != null ? oldAssignee.getName() : null,
+                agent.getName(),
+                requester.getId()
+        );
+
         return toDTO(saved);
     }
 
-    // ---------------------- SEARCH (NOVO) ----------------------
+    // ---------------------- SEARCH ----------------------
 
-    public List<Ticket> searchTickets(
+    public List<TicketResponseDTO> searchTickets(
             TicketStatus status,
             TicketPriority priority,
             Long createdBy,
@@ -152,7 +197,8 @@ public class TicketService {
                 .and(TicketSpecifications.createdAfter(from != null ? from.atStartOfDay() : null))
                 .and(TicketSpecifications.createdBefore(to != null ? to.atTime(23, 59, 59) : null));
 
-        return ticketRepository.findAll(spec);
+        List<Ticket> result = ticketRepository.findAll(spec);
+        return toDTOList(result);
     }
 
     // ---------------------- HELPERS ----------------------
@@ -164,10 +210,18 @@ public class TicketService {
                 saved.getDescription(),
                 saved.getPriority(),
                 saved.getStatus(),
-                saved.getCreatedBy().getId(),
+                saved.getCreatedBy() != null ? saved.getCreatedBy().getId() : null,
+                saved.getCreatedBy() != null ? saved.getCreatedBy().getName() : null,
                 saved.getAssignedTo() != null ? saved.getAssignedTo().getId() : null,
+                saved.getAssignedTo() != null ? saved.getAssignedTo().getName() : null,
                 saved.getCreatedAt(),
                 saved.getUpdatedAt()
         );
+    }
+
+    private List<TicketResponseDTO> toDTOList(List<Ticket> tickets) {
+        return tickets.stream()
+                .map(this::toDTO)
+                .toList();
     }
 }

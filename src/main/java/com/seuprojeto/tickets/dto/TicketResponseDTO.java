@@ -12,7 +12,9 @@ public record TicketResponseDTO(
         TicketPriority priority,
         TicketStatus status,
         Long createdById,
+        String createdByName,
         Long assignedToId,
+        String assignedToName,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {}

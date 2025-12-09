@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 
 public record CreateUserDTO(
         @NotBlank String name,
-        @NotBlank @Email String email,
+        @Email @NotBlank String email,
         @NotBlank String password,
         @NotNull UserRole role
 ) {}
