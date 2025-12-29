@@ -2,10 +2,14 @@ package com.seuprojeto.tickets.controller;
 
 import com.seuprojeto.tickets.dto.CreateTicketDTO;
 import com.seuprojeto.tickets.dto.TicketResponseDTO;
+import com.seuprojeto.tickets.dto.UpdateDepartmentDTO;
 import com.seuprojeto.tickets.dto.UpdateStatusDTO;
+import com.seuprojeto.tickets.dto.AddMessageDTO;
+import com.seuprojeto.tickets.dto.TicketMessageDTO;
 import com.seuprojeto.tickets.enums.TicketPriority;
 import com.seuprojeto.tickets.enums.TicketStatus;
 import com.seuprojeto.tickets.service.TicketService;
+import com.seuprojeto.tickets.service.TicketMessageService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +27,7 @@ import java.util.List;
 public class TicketController {
 
     private final TicketService ticketService;
+    private final TicketMessageService ticketMessageService;
 
     private Long getAuthenticatedUserId() {
         String userIdString = SecurityContextHolder.getContext()
@@ -43,7 +48,8 @@ public class TicketController {
 
     @GetMapping
     public ResponseEntity<List<TicketResponseDTO>> listTickets() {
-        return ResponseEntity.ok(ticketService.listAll());
+        Long userId = getAuthenticatedUserId();
+        return ResponseEntity.ok(ticketService.listAll(userId));
     }
 
     @GetMapping("/me")
@@ -92,6 +98,12 @@ public class TicketController {
         return ResponseEntity.ok(ticketService.assignTicket(ticketId, currentUserId, currentUserId));
     }
 
+    @PatchMapping("/assign/next")
+    public ResponseEntity<TicketResponseDTO> assignNextForCurrentAgent() {
+        Long currentUserId = getAuthenticatedUserId();
+        return ResponseEntity.ok(ticketService.assignNextAvailable(currentUserId));
+    }
+
     // ---------------------- SEARCH ----------------------
 
     @GetMapping("/search")
@@ -100,6 +112,7 @@ public class TicketController {
             @RequestParam(required = false) TicketPriority priority,
             @RequestParam(required = false) Long createdBy,
             @RequestParam(required = false) Long assignedTo,
+            @RequestParam(required = false) Long departmentId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
@@ -107,8 +120,36 @@ public class TicketController {
         Long userId = getAuthenticatedUserId();
 
         List<TicketResponseDTO> result = ticketService.searchTickets(
-                status, priority, createdBy, assignedTo, from, to, userId
+                status, priority, createdBy, assignedTo, departmentId, from, to, userId
         );
         return ResponseEntity.ok(result);
+    }
+
+    // ---------------------- DEPARTMENT ----------------------
+
+    @PatchMapping("/{ticketId}/department")
+    public ResponseEntity<TicketResponseDTO> updateDepartment(
+            @PathVariable Long ticketId,
+            @Valid @RequestBody UpdateDepartmentDTO dto
+    ) {
+        Long userId = getAuthenticatedUserId();
+        return ResponseEntity.ok(ticketService.updateDepartment(ticketId, dto.departmentId(), userId));
+    }
+
+    // ---------------------- MESSAGES ----------------------
+
+    @GetMapping("/{ticketId}/messages")
+    public ResponseEntity<List<TicketMessageDTO>> listMessages(@PathVariable Long ticketId) {
+        Long userId = getAuthenticatedUserId();
+        return ResponseEntity.ok(ticketMessageService.listMessages(ticketId, userId));
+    }
+
+    @PostMapping("/{ticketId}/messages")
+    public ResponseEntity<TicketMessageDTO> addMessage(
+            @PathVariable Long ticketId,
+            @Valid @RequestBody AddMessageDTO dto
+    ) {
+        Long userId = getAuthenticatedUserId();
+        return ResponseEntity.ok(ticketMessageService.addMessage(ticketId, userId, dto.content()));
     }
 }

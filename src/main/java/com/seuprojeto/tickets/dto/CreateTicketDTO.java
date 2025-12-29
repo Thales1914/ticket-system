@@ -7,5 +7,6 @@ import jakarta.validation.constraints.NotNull;
 public record CreateTicketDTO(
         @NotBlank String title,
         @NotBlank String description,
-        @NotNull TicketPriority priority
+        @NotNull TicketPriority priority,
+        @NotNull Long departmentId
 ) {}

@@ -6,6 +6,7 @@ import com.seuprojeto.tickets.enums.TicketPriority;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
 public class TicketSpecifications {
 
@@ -27,6 +28,16 @@ public class TicketSpecifications {
     public static Specification<Ticket> assignedTo(Long agentId) {
         return (root, query, builder) ->
                 agentId == null ? null : builder.equal(root.get("assignedTo").get("id"), agentId);
+    }
+
+    public static Specification<Ticket> department(Long departmentId) {
+        return (root, query, builder) ->
+                departmentId == null ? null : builder.equal(root.get("department").get("id"), departmentId);
+    }
+
+    public static Specification<Ticket> departmentIn(Set<Long> departmentIds) {
+        return (root, query, builder) ->
+                (departmentIds == null || departmentIds.isEmpty()) ? null : root.get("department").get("id").in(departmentIds);
     }
 
     public static Specification<Ticket> createdAfter(LocalDateTime date) {

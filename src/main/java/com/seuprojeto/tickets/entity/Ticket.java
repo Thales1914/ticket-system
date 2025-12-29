@@ -33,6 +33,10 @@ public class Ticket {
     private TicketStatus status;
 
     @ManyToOne
+    @JoinColumn(name = "department_id", nullable = false)
+    private Department department;
+
+    @ManyToOne
     @JoinColumn(name = "created_by_id", nullable = false)
     private User createdBy;
 

@@ -8,7 +8,7 @@ import com.seuprojeto.tickets.entity.User;
 import com.seuprojeto.tickets.enums.UserRole;
 import com.seuprojeto.tickets.security.JwtService;
 import com.seuprojeto.tickets.service.UserService;
-
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -24,29 +24,27 @@ public class AuthController {
     private final UserService userService;
 
     @PostMapping("/register")
-    public UserResponseDTO register(@RequestBody CreateUserDTO dto) {
-        // RegistraÇõÇœo pÇ§blica sempre cria CLIENT independente do payload recebido
+    public UserResponseDTO register(@Valid @RequestBody CreateUserDTO dto) {
         CreateUserDTO safeDto = new CreateUserDTO(
                 dto.name(),
                 dto.email(),
                 dto.password(),
-                UserRole.CLIENT
+                UserRole.CLIENT,
+                dto.departmentIds()
         );
 
         return userService.createUser(safeDto);
     }
 
     @PostMapping("/login")
-    public LoginResponseDTO login(@RequestBody LoginDTO dto) {
+    public LoginResponseDTO login(@Valid @RequestBody LoginDTO dto) {
 
-        // Cria o token de autenticação (e-mail + senha)
         var authToken = new UsernamePasswordAuthenticationToken(
                 dto.email(),
                 dto.password()
         );
 
         authenticationManager.authenticate(authToken);
-
 
         User user = userService.getUserByEmail(dto.email());
 

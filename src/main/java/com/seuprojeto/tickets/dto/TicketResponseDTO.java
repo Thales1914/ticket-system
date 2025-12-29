@@ -14,6 +14,8 @@ public record TicketResponseDTO(
         Long createdById,
         String createdByName,
         String createdByEmail,
+        Long departmentId,
+        String departmentName,
         Long assignedToId,
         String assignedToName,
         String assignedToEmail,
